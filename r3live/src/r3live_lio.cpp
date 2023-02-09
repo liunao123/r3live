@@ -1018,7 +1018,7 @@ int R3LIVE::service_LIO_update()
             /******* Publish Odometry ******/
             geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw( euler_cur( 0 ), euler_cur( 1 ), euler_cur( 2 ) );
             odomAftMapped.header.frame_id = "world";
-            odomAftMapped.child_frame_id = "/aft_mapped";
+            odomAftMapped.child_frame_id = "imu";
             odomAftMapped.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
             odomAftMapped.pose.pose.orientation.x = geoQuat.x;
             odomAftMapped.pose.pose.orientation.y = geoQuat.y;
@@ -1040,7 +1040,28 @@ int R3LIVE::service_LIO_update()
             q.setY( odomAftMapped.pose.pose.orientation.y );
             q.setZ( odomAftMapped.pose.pose.orientation.z );
             transform.setRotation( q );
-            br.sendTransform( tf::StampedTransform( transform, ros::Time().fromSec( Measures.lidar_end_time ), "world", "/aft_mapped" ) );
+            br.sendTransform( tf::StampedTransform( transform, ros::Time().fromSec( Measures.lidar_end_time ), "world", "imu" ) );
+
+
+            Eigen::Quaterniond q_eigen = Eigen::Quaterniond(extR_lc); // 旋转矩阵转为四元数
+            q_eigen.normalize();
+            transform.setOrigin(tf::Vector3(extT_lc(0), extT_lc(1), extT_lc(2)));
+            q.setW(q_eigen.w());
+            q.setX(q_eigen.x());
+            q.setY(q_eigen.y());
+            q.setZ(q_eigen.z());
+            transform.setRotation(q);
+            br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "livox", "camera"));
+
+
+            transform.setOrigin(tf::Vector3(Lidar_offset_to_IMU(0), Lidar_offset_to_IMU(1), Lidar_offset_to_IMU(2)));
+            q.setW(1);
+            q.setX(0);
+            q.setY(0);
+            q.setZ(0);
+            transform.setRotation(q);
+            br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "livox"));
+            br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "velodyne"));
 
             msg_body_pose.header.stamp = ros::Time::now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
@@ -1051,6 +1072,41 @@ int R3LIVE::service_LIO_update()
             msg_body_pose.pose.orientation.y = geoQuat.y;
             msg_body_pose.pose.orientation.z = geoQuat.z;
             msg_body_pose.pose.orientation.w = geoQuat.w;
+                        
+            // get  lidar pose in world frame
+            auto lidar_pose = msg_body_pose;
+            lidar_pose.header.frame_id = "world";
+
+            /*
+            旋转是一样的
+            R_lidar =  msg_body_pose.pose.pose.orientation;
+
+            平移 有个相对位移
+            T_lidar = g_lio_state.rot_end * Lidar_offset_to_IMU + Eigen::msg_body_pose.pose.pose.position;
+            */
+            Eigen::Vector3d T_lidar = g_lio_state.rot_end * Lidar_offset_to_IMU + g_lio_state.pos_end;
+            lidar_pose.pose.position.x = T_lidar(0);
+            lidar_pose.pose.position.y = T_lidar(1);
+            lidar_pose.pose.position.z = T_lidar(2);
+            // lidar_pose.pose.orientation = msg_body_pose.pose.orientation;
+            pubLidarOdom.publish(lidar_pose);
+
+            static ofstream lio_path_file("/home/map/r3live_body_path.txt", ios::out);
+            lio_path_file.open("/home/map/r3live_body_path.txt", ios::app);
+            lio_path_file.setf(ios::fixed, ios::floatfield);
+            lio_path_file.precision(10);
+            lio_path_file << Measures.lidar_end_time  << " ";
+            lio_path_file.precision(5);
+
+            lio_path_file
+                << g_lio_state.pos_end.x() << " "
+                << g_lio_state.pos_end.y() << " "
+                << g_lio_state.pos_end.z() << " "
+                << geoQuat.x << " "
+                << geoQuat.y << " "
+                << geoQuat.z << " "
+                << geoQuat.w << endl;
+            lio_path_file.close();
 
             /******* Publish Path ********/
             msg_body_pose.header.frame_id = "world";

@@ -185,6 +185,9 @@ public:
     Eigen::Vector3f XAxisPoint_body; //(LIDAR_SP_LEN, 0.0, 0.0);
     Eigen::Vector3f XAxisPoint_world; //(LIDAR_SP_LEN, 0.0, 0.0);
 
+    Eigen::Vector3d extT_lc;
+    Eigen::Matrix3d extR_lc;
+
     std::vector<BoxPointType> cub_needrm;
     std::vector<BoxPointType> cub_needad;
 
@@ -201,6 +204,7 @@ public:
     ros::Publisher pubLaserCloudEffect;
     ros::Publisher pubLaserCloudMap;
     ros::Publisher pubOdomAftMapped;
+    ros::Publisher pubLidarOdom;
     ros::Publisher pubPath;
     ros::Subscriber sub_pcl;
     ros::Subscriber sub_imu;
@@ -332,6 +336,16 @@ public:
         get_ros_parameter<std::string>(m_ros_node_handle, "/IMU_topic", IMU_topic, std::string("/livox/imu") );
         get_ros_parameter<std::string>(m_ros_node_handle, "/Image_topic", IMAGE_topic, std::string("/camera/image_color") );
         IMAGE_topic_compressed = std::string(IMAGE_topic).append("/compressed");
+
+        std::vector<double>  camera_ext_R_data_lc(9, 0.0), camera_ext_t_data_lc(3, 0.0);
+        m_ros_node_handle.getParam("r3live_vio/camera_ext_t", camera_ext_t_data_lc);
+        m_ros_node_handle.getParam("r3live_vio/camera_ext_R", camera_ext_R_data_lc);
+
+        extT_lc << VEC_FROM_ARRAY(camera_ext_t_data_lc);
+        extR_lc << MAT_FROM_ARRAY(camera_ext_R_data_lc);
+        cout << "ttttt_lc "  << extT_lc <<  endl;
+        cout << "rrrrr_lc "  << extR_lc <<  endl;        
+
         if(1)
         {
             scope_color(ANSI_COLOR_BLUE_BOLD);
@@ -366,6 +380,7 @@ public:
             get_ros_parameter( m_ros_node_handle, "r3live_common/minimum_pts_size", m_minumum_rgb_pts_size, 0.05 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/record_offline_map", m_if_record_mvs, 0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/pub_pt_minimum_views", m_pub_pt_minimum_views, 5 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/control_image_freq", m_control_image_freq, 10.0);
 
             get_ros_parameter( m_ros_node_handle, "r3live_common/image_downsample_ratio", m_image_downsample_ratio, 1.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/esikf_iter_times", esikf_iter_times, 2 );

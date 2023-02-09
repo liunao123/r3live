@@ -30,8 +30,9 @@
 #define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
 
 #define PI_M (3.14159265358)
-#define G_m_s2 (9.81)     // Gravity const in Hong Kong SAR, China
-#define G_m_s2 (9.7949)     // Gravaty const in NanJing/China
+// #define G_m_s2 (9.81)     // Gravity const in Hong Kong SAR, China
+#define G_m_s2 (9.7949)     // Gravity const in NJ, China
+
 #if ENABLE_CAMERA_OBS
 #define DIM_OF_STATES (29) // with vio obs
 #else
@@ -58,9 +59,8 @@ static const Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
-// static const Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
+static const Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
 // static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
-static const Eigen::Vector3d Lidar_offset_to_IMU(0.088, 0.156, 0.154); // v2 define
 
 struct Pose6D
 {
