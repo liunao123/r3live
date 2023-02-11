@@ -200,7 +200,7 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
 void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( Lidar_offset_to_IMU_extrinsic_R *p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -211,7 +211,7 @@ void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 void R3LIVE::RGBpointBodyToWorld( PointType const *const pi, pcl::PointXYZI *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( Lidar_offset_to_IMU_extrinsic_R *p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -802,7 +802,9 @@ int R3LIVE::service_LIO_update()
                     {
                         const PointType &laser_p = laserCloudOri->points[ i ];
                         Eigen::Vector3d  point_this( laser_p.x, laser_p.y, laser_p.z );
-                        point_this += Lidar_offset_to_IMU;
+                        // point_this += Lidar_offset_to_IMU;
+                        point_this = Lidar_offset_to_IMU_extrinsic_R * point_this + Lidar_offset_to_IMU;
+                        
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX( point_this );
 
@@ -1043,22 +1045,24 @@ int R3LIVE::service_LIO_update()
             br.sendTransform( tf::StampedTransform( transform, ros::Time().fromSec( Measures.lidar_end_time ), "world", "imu" ) );
 
 
-            Eigen::Quaterniond q_eigen = Eigen::Quaterniond(extR_lc); // 旋转矩阵转为四元数
+            Eigen::Quaterniond q_eigen = Eigen::Quaterniond(ext_r_lc); // 旋转矩阵转为四元数
             q_eigen.normalize();
-            transform.setOrigin(tf::Vector3(extT_lc(0), extT_lc(1), extT_lc(2)));
+            transform.setOrigin(tf::Vector3(ext_t_lc(0), ext_t_lc(1), ext_t_lc(2)));
             q.setW(q_eigen.w());
             q.setX(q_eigen.x());
             q.setY(q_eigen.y());
             q.setZ(q_eigen.z());
             transform.setRotation(q);
             br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "livox", "camera"));
+            br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "velodyne", "camera"));
 
-
+            q_eigen = Eigen::Quaterniond(ext_r_il); // 旋转矩阵转为四元数
+            q_eigen.normalize();
+            q.setW(q_eigen.w());
+            q.setX(q_eigen.x());
+            q.setY(q_eigen.y());
+            q.setZ(q_eigen.z());
             transform.setOrigin(tf::Vector3(Lidar_offset_to_IMU(0), Lidar_offset_to_IMU(1), Lidar_offset_to_IMU(2)));
-            q.setW(1);
-            q.setX(0);
-            q.setY(0);
-            q.setZ(0);
             transform.setRotation(q);
             br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "livox"));
             br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "velodyne"));
@@ -1088,7 +1092,15 @@ int R3LIVE::service_LIO_update()
             lidar_pose.pose.position.x = T_lidar(0);
             lidar_pose.pose.position.y = T_lidar(1);
             lidar_pose.pose.position.z = T_lidar(2);
-            // lidar_pose.pose.orientation = msg_body_pose.pose.orientation;
+
+            tf::Quaternion                  q_imu;
+            q.setW(q_eigen.w());
+            q.setX(q_eigen.x());
+            q.setY(q_eigen.y());
+            q.setZ(q_eigen.z());
+
+            lidar_pose.pose.orientation = q * msg_body_pose.pose.orientation;
+            
             pubLidarOdom.publish(lidar_pose);
 
             static ofstream lio_path_file("/home/map/r3live_body_path.txt", ios::out);

@@ -59,8 +59,12 @@ static const Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
-static const Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
+// static const Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
 // static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+
+
+// static const Eigen::Vector3d Lidar_offset_to_IMU(0.088, 0.156, 0.154); // v2 define design value
+static const Eigen::Vector3d Lidar_offset_to_IMU(0.081677, 0.168409, 0.141423); // v2 define calibrate value
 
 struct Pose6D
 {

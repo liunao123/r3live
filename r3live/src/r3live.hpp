@@ -185,8 +185,14 @@ public:
     Eigen::Vector3f XAxisPoint_body; //(LIDAR_SP_LEN, 0.0, 0.0);
     Eigen::Vector3f XAxisPoint_world; //(LIDAR_SP_LEN, 0.0, 0.0);
 
-    Eigen::Vector3d extT_lc;
-    Eigen::Matrix3d extR_lc;
+    // camera2lidar
+    Eigen::Vector3d ext_t_lc;
+    Eigen::Matrix3d ext_r_lc;
+    
+    // lidar2imu
+    Eigen::Vector3d ext_t_il;
+    Eigen::Matrix3d ext_r_il;
+    Eigen::Matrix3d Lidar_offset_to_IMU_extrinsic_R;
 
     std::vector<BoxPointType> cub_needrm;
     std::vector<BoxPointType> cub_needad;
@@ -340,11 +346,20 @@ public:
         std::vector<double>  camera_ext_R_data_lc(9, 0.0), camera_ext_t_data_lc(3, 0.0);
         m_ros_node_handle.getParam("r3live_vio/camera_ext_t", camera_ext_t_data_lc);
         m_ros_node_handle.getParam("r3live_vio/camera_ext_R", camera_ext_R_data_lc);
-
-        extT_lc << VEC_FROM_ARRAY(camera_ext_t_data_lc);
-        extR_lc << MAT_FROM_ARRAY(camera_ext_R_data_lc);
-        cout << "ttttt_lc "  << extT_lc <<  endl;
-        cout << "rrrrr_lc "  << extR_lc <<  endl;        
+        ext_t_lc << VEC_FROM_ARRAY(camera_ext_t_data_lc);
+        ext_r_lc << MAT_FROM_ARRAY(camera_ext_R_data_lc);
+        ROS_INFO_STREAM( "r3live_vio/camera_ext_t \n" << ext_t_lc ) ;
+        ROS_INFO_STREAM( "r3live_vio/camera_ext_R \n" << ext_r_lc ) ;
+        
+        std::vector<double>  camera_ext_R_data_il(9, 0.0), camera_ext_t_data_il(3, 0.0);
+        m_ros_node_handle.getParam("r3live_lio/lidar2imu_ext_t", camera_ext_t_data_il);
+        m_ros_node_handle.getParam("r3live_lio/lidar2imu_ext_R", camera_ext_R_data_il);
+        ext_t_il << VEC_FROM_ARRAY(camera_ext_t_data_il);
+        ext_r_il << MAT_FROM_ARRAY(camera_ext_R_data_il);
+        // Lidar_offset_to_IMU = ext_t_il;
+        Lidar_offset_to_IMU_extrinsic_R = ext_r_il;
+        ROS_INFO_STREAM( "r3live_lio/camera_ext_t \n" << ext_t_il ) ;
+        ROS_INFO_STREAM( "r3live_lio/camera_ext_R \n" << Lidar_offset_to_IMU_extrinsic_R ) ;
 
         if(1)
         {
@@ -446,7 +461,7 @@ public:
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
         Eigen::Vector3d p_body(pi[0], pi[1], pi[2]);
-        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
+        Eigen::Vector3d p_global(g_lio_state.rot_end * ( Lidar_offset_to_IMU_extrinsic_R * p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
         po[0] = p_global(0);
         po[1] = p_global(1);
         po[2] = p_global(2);

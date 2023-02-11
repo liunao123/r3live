@@ -55,3 +55,9 @@ r3live_lio:
    filter_size_surf: 0.40
    filter_size_surf_z: 0.40
    filter_size_map: 0.50
+   
+   lidar2imu_ext_R:
+         [0.999901 , 0.013091 ,-0.005085,
+          -0.013061 , 0.999897 , 0.005917 , 
+          0.005162 , -0.005850 , 0.999970 ]
+   lidar2imu_ext_t: [ 0.081677, 0.168409, 0.141423]
