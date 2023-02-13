@@ -6,7 +6,7 @@
     <param name="r3live_common/map_output_dir" type="string" value="$(env HOME)/r3live_output" />
     <rosparam command="load" file="$(find r3live)/../config/r3live_config_v2.yaml" />
 
-    <!-- <node pkg="r3live" type="r3live_LiDAR_front_end" name="r3live_LiDAR_front_end"  output="screen" required="true"/> -->
+    <node pkg="r3live" type="r3live_LiDAR_front_end" name="r3live_LiDAR_front_end"  output="screen" required="true"/>
     <node pkg="r3live" type="r3live_mapping" name="r3live_mapping" output="screen" required="true" />
     
     <arg name="rviz" default="1" />

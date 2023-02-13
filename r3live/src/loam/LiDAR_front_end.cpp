@@ -289,6 +289,125 @@ int orders[ 16 ] = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
 void velo16_handler( const sensor_msgs::PointCloud2::ConstPtr &msg )
 {
     // TODO
+  pcl::PointCloud<PointType> pl_orig;
+  pcl::fromROSMsg(*msg, pl_orig);
+  uint plsize = pl_orig.size();
+
+  vector<pcl::PointCloud<PointType>> pl_buff(N_SCANS);
+  vector<vector<orgtype>> typess(N_SCANS);
+  pcl::PointCloud<PointType> pl_corn, pl_surf, pl_full;
+  
+//   for(uint i=0; i<plsize; i++)
+//   {
+//     PointType &ap = pl_orig[i];
+//     ap.normal_x = 0;
+//     ap.normal_y = 0;
+//     ap.normal_z = 0;
+//     ap.intensity = pl_orig.points[i].intensity;
+//     // ap.curvature = pl_orig.points[i].time / 1000.0; // units: ms
+    
+//     double leng = sqrt(ap.x*ap.x + ap.y*ap.y);
+//     if(leng < blind)
+//     {
+//       continue;
+//     }
+
+//     if(leng > 100.0)
+//     {
+//       continue;
+//     }
+//     pl_surf.points.push_back(ap);
+//   }
+//   pub_func(pl_surf, pub_surf, msg->header.stamp);
+
+//   return ;
+
+
+  int scanID;
+  int last_stat = -1;
+  int idx = 0;
+
+  for(int i=0; i<N_SCANS; i++)
+  {
+    pl_buff[i].resize(plsize);
+    typess[i].resize(plsize);
+  }
+
+  for(uint i=0; i<plsize; i++)
+  {
+    PointType &ap = pl_orig[i];
+    double leng = sqrt(ap.x*ap.x + ap.y*ap.y);
+    if(leng < blind)
+    {
+      continue;
+    }
+
+    if(leng > 100)
+    {
+      continue;
+    }
+
+    double ang = atan(ap.z / leng)*rad2deg;
+    scanID = int((ang + 15) / 2 + 0.5);
+
+    if(scanID>=N_SCANS || scanID<0)
+    {
+      continue;
+    }
+
+    if(orders[scanID] <= last_stat)
+    {
+      idx++;
+    }
+
+    pl_buff[scanID][idx].x = ap.x;
+    pl_buff[scanID][idx].y = ap.y;
+    pl_buff[scanID][idx].z = ap.z;
+    pl_buff[scanID][idx].intensity = ap.intensity;
+    typess[scanID][idx].range = leng;
+    last_stat = orders[scanID];
+  }
+  
+  // pub all line points单独
+  // for(int i=0; i<N_SCANS; i++)
+  // {
+  //   pl_full += pl_buff[i];
+  //   pub_func(pl_buff[i], pub_full, msg->header.stamp);
+  // }
+  idx++;
+
+  for(int j=0; j<N_SCANS; j++)
+  {
+    pcl::PointCloud<PointType> &pl = pl_buff[j];
+    vector<orgtype> &types = typess[j];
+    pl.erase(pl.begin()+idx, pl.end());
+    types.erase(types.begin()+idx, types.end());
+    plsize = idx - 1;
+    for(uint i=0; i<plsize; i++)
+    {
+      // types[i].range = sqrt(pl[i].x*pl[i].x + pl[i].y*pl[i].y);
+      vx = pl[i].x - pl[i+1].x;
+      vy = pl[i].y - pl[i+1].y;
+      vz = pl[i].z - pl[i+1].z;
+      types[i].dista = vx*vx + vy*vy + vz*vz;
+    }
+    types[plsize].range = sqrt(pl[plsize].x*pl[plsize].x + pl[plsize].y*pl[plsize].y);
+    if (types.size() == 0)
+    {
+        return ;
+    }
+    
+    give_feature(pl, types, pl_corn, pl_surf);
+  }
+
+  // printf("%zu %zu\n", pl_surf.size(), pl_corn.size());
+  // ROS_ERROR("pl_orig size is %ld .",pl_orig.size());
+  // ROS_ERROR("pl_surf size is %ld .",pl_surf.size());
+  // ROS_ERROR("pl_corn size is %ld .",pl_corn.size());
+
+  pub_func(pl_orig, pub_full, msg->header.stamp);
+  pub_func(pl_surf, pub_surf, msg->header.stamp);
+  pub_func(pl_corn, pub_corn, msg->header.stamp);
 }
 
 void velo16_handler1( const sensor_msgs::PointCloud2::ConstPtr &msg )
@@ -395,6 +514,11 @@ void give_feature( pcl::PointCloud< PointType > &pl, vector< orgtype > &types, p
     while ( types[ head ].range < blind )
     {
         head++;
+        // fix bug node died
+        if (head == types.size())
+        {
+            break;
+        }        
     }
 
     // Surf

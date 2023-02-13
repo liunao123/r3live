@@ -1067,7 +1067,7 @@ int R3LIVE::service_LIO_update()
             br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "livox"));
             br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec( Measures.lidar_end_time ), "imu", "velodyne"));
 
-            msg_body_pose.header.stamp = ros::Time::now();
+            msg_body_pose.header.stamp = ros::Time().fromSec( Measures.lidar_end_time ) ; // ros::Time::now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
             msg_body_pose.pose.position.x = g_lio_state.pos_end( 0 );
             msg_body_pose.pose.position.y = g_lio_state.pos_end( 1 );
@@ -1080,6 +1080,7 @@ int R3LIVE::service_LIO_update()
             // get  lidar pose in world frame
             auto lidar_pose = msg_body_pose;
             lidar_pose.header.frame_id = "world";
+            lidar_pose.header.stamp = ros::Time().fromSec( Measures.lidar_end_time );
 
             /*
             旋转是一样的
@@ -1093,13 +1094,15 @@ int R3LIVE::service_LIO_update()
             lidar_pose.pose.position.y = T_lidar(1);
             lidar_pose.pose.position.z = T_lidar(2);
 
-            tf::Quaternion                  q_imu;
-            q.setW(q_eigen.w());
-            q.setX(q_eigen.x());
-            q.setY(q_eigen.y());
-            q.setZ(q_eigen.z());
+            q_eigen       = Eigen::Quaterniond(ext_r_il * g_lio_state.rot_end);      // 旋转矩阵转为四元数
+            q_eigen.normalize();
 
-            lidar_pose.pose.orientation = q * msg_body_pose.pose.orientation;
+            lidar_pose.pose.orientation.w = q_eigen.w() ;
+            lidar_pose.pose.orientation.x = q_eigen.x() ;
+            lidar_pose.pose.orientation.y = q_eigen.y() ;
+            lidar_pose.pose.orientation.z = q_eigen.z() ;
+
+            // lidar_pose.pose.orientation = q * msg_body_pose.pose.orientation;
             
             pubLidarOdom.publish(lidar_pose);
 

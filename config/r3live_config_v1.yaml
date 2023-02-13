@@ -1,8 +1,9 @@
 Lidar_front_end:
    lidar_type: 1   # 1 for Livox-avia, 3 for Ouster-OS1-64
    N_SCANS: 6
-   using_raw_point: 1
-   point_step: 1
+   using_raw_point: 0
+   point_step: 2
+   blind: 1.0
    
 r3live_common:
    if_dump_log: 0                   # If recording ESIKF update log. [default = 0]
