@@ -12,6 +12,7 @@ add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
 # Add OpenCV if available
 # set(OpenCV_DIR "/home/zivlin/opt/opencv/build")
+set(OpenCV_DIR "/home/liunao/r3/opencv-4.5.3/build")
 FIND_PACKAGE(Boost REQUIRED COMPONENTS filesystem iostreams program_options system serialization)
 if(Boost_FOUND)
 	INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
@@ -30,7 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # find_package(Ceres REQUIRED)
 find_package(PCL REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 4.5 REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
@@ -86,8 +87,11 @@ message(STATUS "===== OpenCV ersion: ${OpenCV_VERSION}  =====")
 message(STATUS "===== OpenCV libraries: ${OpenCV_LIBS} =====")
 message(STATUS "===== OpenCV include path: ${OpenCV_INCLUDE_DIRS} =====")
 
+include_directories(  ${PCL_INCLUDE_DIRS} )
+
 add_executable(r3live_LiDAR_front_end src/loam/LiDAR_front_end.cpp)
 target_link_libraries(r3live_LiDAR_front_end ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 if(Ceres_FOUND)
   message(STATUS "===== Find ceres, Version ${Ceres_VERSION} =====")  
   include_directories(${CERES_INCLUDE_DIRS})

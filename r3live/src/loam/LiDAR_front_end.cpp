@@ -1,8 +1,30 @@
+#define PCL_NO_PRECOMPILE
 #include <ros/ros.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <livox_ros_driver/CustomMsg.h>
 #include "../tools/tools_logger.hpp"
+
+#include <pcl/filters/extract_indices.h>
+#include <pcl/point_cloud.h>
+#include <pcl/pcl_macros.h>
+
+#include <pcl/filters/filter.h> // removeNaNFromPointCloud function 
+
+
+struct RsPointXYZIRT
+{
+  PCL_ADD_POINT4D;
+  float intensity;
+  // PCL_ADD_INTENSITY;
+  uint16_t ring = 0;
+  double timestamp = 0;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(RsPointXYZIRT,
+                                  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint16_t, ring, ring)(double, timestamp, timestamp))
+
 
 using namespace std;
 
@@ -288,126 +310,189 @@ int orders[ 16 ] = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
 
 void velo16_handler( const sensor_msgs::PointCloud2::ConstPtr &msg )
 {
-    // TODO
-  pcl::PointCloud<PointType> pl_orig;
+
+
+  typedef pcl::PointCloud<PointType> PointCloudXYZI;
+
+  PointCloudXYZI pl_buff[128]; //maximum 128 line lidar
+  vector<orgtype> typess[128]; //maximum 128 line lidar
+
+  // 用原始的 rslidar  。不用 rs_to_velodyne 转
+  pcl::PointCloud< PointType > pl_corn, pl_surf, pl_full;
+
+  pcl::PointCloud<RsPointXYZIRT> pl_orig ;
+  // pcl::PointCloud<RsPointXYZIRT>::Ptr cloud_undis(new pcl::PointCloud<RsPointXYZIRT>());
+
   pcl::fromROSMsg(*msg, pl_orig);
-  uint plsize = pl_orig.size();
+    // ROS_ERROR("pl_orig->size()is %d",  pl_orig.size());
+  // ROS_WARN("first, last , msg->header.stamp.toSec() : %f . %f. %f ", pl_orig.points[0].timestamp , pl_orig.points.back().timestamp , msg->header.stamp.toSec());
+  auto first_point_time = pl_orig.points[0].timestamp;
 
-  vector<pcl::PointCloud<PointType>> pl_buff(N_SCANS);
-  vector<vector<orgtype>> typess(N_SCANS);
-  pcl::PointCloud<PointType> pl_corn, pl_surf, pl_full;
+  // 根据索引把 nan 去掉
+  pcl::PointCloud<pcl::PointXYZ> pl_orig_xyz;
+  pcl::fromROSMsg(*msg, pl_orig_xyz);
+
+  std::vector<int> save_index;
+  pcl::removeNaNFromPointCloud(pl_orig_xyz, pl_orig_xyz, save_index);
+  boost::shared_ptr<std::vector<int>> index_ptr = boost::make_shared<std::vector<int>>(save_index);
   
-//   for(uint i=0; i<plsize; i++)
-//   {
-//     PointType &ap = pl_orig[i];
-//     ap.normal_x = 0;
-//     ap.normal_y = 0;
-//     ap.normal_z = 0;
-//     ap.intensity = pl_orig.points[i].intensity;
-//     // ap.curvature = pl_orig.points[i].time / 1000.0; // units: ms
+  pcl::ExtractIndices<RsPointXYZIRT> extract;
+  extract.setInputCloud( pl_orig.makeShared() );
+  extract.setIndices(index_ptr);
+  extract.setNegative(false); // 保留 不是 索引的 数据 设置为  true
+  extract.filter(pl_orig);
+
+    // ROS_ERROR("pl_orig->size()is %d",  pl_orig.size());
+
+    uint plsize = pl_orig.size();
+    if ( plsize <= 0 )
+    {
+      return ;
+    }
+
+    // debug
+    // pcl::PCDWriter pcd_writer;
+    // cout << "saving...";
+    // pcd_writer.writeBinary("/home/msg.pcd", pl_orig);
+    bool is_first[16];
+    bool is_jump[16]={false};       // if jump point
+    double yaw_fp[20]={0};     // yaw of first scan point
+    int layer;                 // layer number
+    double omega_l=3.61;       // scan angular velocity
+    float yaw_last[16]={0.0};  // yaw of last scan point
+    float time_last[16]={0.0}; // last offset time
+    float time_jump[16]={0.0}; // offset time before jump
+    memset(is_first, true, sizeof(is_first));
+
+    double max_blind = 200.0;
+
     
-//     double leng = sqrt(ap.x*ap.x + ap.y*ap.y);
-//     if(leng < blind)
-//     {
-//       continue;
-//     }
-
-//     if(leng > 100.0)
-//     {
-//       continue;
-//     }
-//     pl_surf.points.push_back(ap);
-//   }
-//   pub_func(pl_surf, pub_surf, msg->header.stamp);
-
-//   return ;
-
-
-  int scanID;
-  int last_stat = -1;
-  int idx = 0;
-
-  for(int i=0; i<N_SCANS; i++)
-  {
-    pl_buff[i].resize(plsize);
-    typess[i].resize(plsize);
-  }
-
-  for(uint i=0; i<plsize; i++)
-  {
-    PointType &ap = pl_orig[i];
-    double leng = sqrt(ap.x*ap.x + ap.y*ap.y);
-    if(leng < blind)
+    if(0)
     {
-      continue;
+    //   for (int i = 0; i < N_SCANS; i++)
+    //   {
+    //     pl_buff[i].clear();
+    //     pl_buff[i].reserve(plsize);
+    //   }
+      
+    //   for (int i = 0; i < plsize; i++)
+    //   {
+    //     if (i % point_filter_num != 0)
+    //     {
+    //       continue;
+    //     }
+
+    //     PointType added_pt;
+    //     added_pt.normal_x = 0;
+    //     added_pt.normal_y = 0;
+    //     added_pt.normal_z = 0;
+    //     layer=pl_orig.points[i].ring;
+    //     // if (layer >= N_SCANS) continue;
+    //     added_pt.x = pl_orig.points[i].x;
+    //     added_pt.y = pl_orig.points[i].y;
+    //     added_pt.z = pl_orig.points[i].z;
+    //     added_pt.intensity = pl_orig.points[i].intensity;
+
+    //     // time off 
+    //     // * 1000 是 后面 / 1000 了。。 为了与velodyne的代码兼容
+    //     added_pt.curvature = ( pl_orig.points[i].timestamp - first_point_time  ) * 1000.0 ;
+    //     // ROS_WARN("pl_orig.points[i].timestamp - msg->header.stamp.toSec() : %f . %f ", pl_orig.points[i].timestamp , msg->header.stamp.toSec());
+
+    //     float range_temp_sqrt =added_pt.x*added_pt.x+added_pt.y*added_pt.y+added_pt.z*added_pt.z ;
+    //     if(range_temp_sqrt < blind * blind || range_temp_sqrt > max_blind * max_blind) // max_blind 认为是 雷达的有效探测范围
+    //     {
+    //       continue;
+    //     }
+
+    //     // if(added_pt.x < 0)         continue; //! test for liejian
+
+    //     pl_buff[layer].points.push_back(added_pt);
+    //   }
+
+    //   for (int j = 0; j < N_SCANS; j++)
+    //   {
+    //     PointCloudXYZI &pl = pl_buff[j];
+    //     uint linesize = pl.size();
+    //     // fix bug when extract lio feature
+    //     // ROS_WARN("linesize : %d", linesize);
+    //     if (linesize == 0)
+    //     {
+    //       continue;
+    //     }
+        
+    //     vector<orgtype> &types = typess[j];
+    //     types.clear();
+    //     types.resize(linesize);
+    //     linesize--;
+    //     for (uint i = 0; i < linesize; i++)
+    //     {
+    //       types[i].range = sqrt(pl[i].x * pl[i].x + pl[i].y * pl[i].y);
+    //       vx = pl[i].x - pl[i + 1].x;
+    //       vy = pl[i].y - pl[i + 1].y;
+    //       vz = pl[i].z - pl[i + 1].z;
+    //       types[i].dista = vx * vx + vy * vy + vz * vz;
+    //     }
+    //     types[linesize].range = sqrt(pl[linesize].x * pl[linesize].x + pl[linesize].y * pl[linesize].y);
+    //     give_feature(pl, types);
+    //   }
+      // cout << "-------------saving feature pcd..." << pl_surf.points.size();
+      // pcd_writer.writeBinary("/home/msg_feature.pcd", pl_surf);  
+    }
+    else
+    {
+
+      for (int i = 0; i < N_SCANS; i++)
+      {
+        pl_buff[i].clear();
+        pl_buff[i].reserve(plsize);
+      }
+      
+      for (int i = 0; i < plsize; i++)
+      {
+        if (i % point_filter_num != 0)
+        {
+          continue;
+        }
+        
+        // wanjee的激光雷达，需要手动去除 nan 点
+        if(std::isnan(pl_orig.points[i].x) || std::isnan(pl_orig.points[i].y) || std::isnan(pl_orig.points[i].z) )
+        {
+          continue;
+        }
+
+        PointType added_pt;
+        added_pt.normal_x = 0;
+        added_pt.normal_y = 0;
+        added_pt.normal_z = 0;
+        // layer=pl_orig.points[i].ring;
+        // if (layer >= N_SCANS) continue;
+        added_pt.x = pl_orig.points[i].x;
+        added_pt.y = pl_orig.points[i].y;
+        added_pt.z = pl_orig.points[i].z;
+        added_pt.intensity = pl_orig.points[i].intensity;
+
+        // time off 
+        // * 1000 是 后面 / 1000 了。。 为了与velodyne的代码兼容
+        added_pt.curvature = ( pl_orig.points[i].timestamp - first_point_time  ) * 1000.0 ;
+
+        float range_temp_sqrt =added_pt.x*added_pt.x+added_pt.y*added_pt.y+added_pt.z*added_pt.z ;
+        if(range_temp_sqrt < blind * blind || range_temp_sqrt > max_blind * max_blind) // max_blind 认为是 雷达的有效探测范围
+        {
+          continue;
+        }
+
+        // if(added_pt.x < 0)         continue; //! test for liejian
+        pl_surf.points.push_back(added_pt);
+
+      }
+
     }
 
-    if(leng > 100)
-    {
-      continue;
-    }
+    // pub_func(pl_orig, pub_full, msg->header.stamp );
+    pub_func(pl_surf, pub_surf, msg->header.stamp );
+    // pub_func(pl_corn, pub_corn,  msg->header.stamp );
 
-    double ang = atan(ap.z / leng)*rad2deg;
-    scanID = int((ang + 15) / 2 + 0.5);
-
-    if(scanID>=N_SCANS || scanID<0)
-    {
-      continue;
-    }
-
-    if(orders[scanID] <= last_stat)
-    {
-      idx++;
-    }
-
-    pl_buff[scanID][idx].x = ap.x;
-    pl_buff[scanID][idx].y = ap.y;
-    pl_buff[scanID][idx].z = ap.z;
-    pl_buff[scanID][idx].intensity = ap.intensity;
-    typess[scanID][idx].range = leng;
-    last_stat = orders[scanID];
-  }
-  
-  // pub all line points单独
-  // for(int i=0; i<N_SCANS; i++)
-  // {
-  //   pl_full += pl_buff[i];
-  //   pub_func(pl_buff[i], pub_full, msg->header.stamp);
-  // }
-  idx++;
-
-  for(int j=0; j<N_SCANS; j++)
-  {
-    pcl::PointCloud<PointType> &pl = pl_buff[j];
-    vector<orgtype> &types = typess[j];
-    pl.erase(pl.begin()+idx, pl.end());
-    types.erase(types.begin()+idx, types.end());
-    plsize = idx - 1;
-    for(uint i=0; i<plsize; i++)
-    {
-      // types[i].range = sqrt(pl[i].x*pl[i].x + pl[i].y*pl[i].y);
-      vx = pl[i].x - pl[i+1].x;
-      vy = pl[i].y - pl[i+1].y;
-      vz = pl[i].z - pl[i+1].z;
-      types[i].dista = vx*vx + vy*vy + vz*vz;
-    }
-    types[plsize].range = sqrt(pl[plsize].x*pl[plsize].x + pl[plsize].y*pl[plsize].y);
-    if (types.size() == 0)
-    {
-        return ;
-    }
-    
-    give_feature(pl, types, pl_corn, pl_surf);
-  }
-
-  // printf("%zu %zu\n", pl_surf.size(), pl_corn.size());
-  // ROS_ERROR("pl_orig size is %ld .",pl_orig.size());
-  // ROS_ERROR("pl_surf size is %ld .",pl_surf.size());
-  // ROS_ERROR("pl_corn size is %ld .",pl_corn.size());
-
-  pub_func(pl_orig, pub_full, msg->header.stamp);
-  pub_func(pl_surf, pub_surf, msg->header.stamp);
-  pub_func(pl_corn, pub_corn, msg->header.stamp);
+//   ros::Time().fromSec(last_timestamp_lidar); // ros::Time::now();
 }
 
 void velo16_handler1( const sensor_msgs::PointCloud2::ConstPtr &msg )

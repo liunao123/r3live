@@ -2,7 +2,7 @@ Lidar_front_end:
    lidar_type: 1   # 1 for Livox-avia, 3 for Ouster-OS1-64
    N_SCANS: 6
    using_raw_point: 0
-   point_step: 2
+   point_step: 1
    blind: 0.20
    
 r3live_common:
@@ -11,30 +11,29 @@ r3live_common:
    pub_pt_minimum_views: 3          # Publish points which have been render up to "pub_pt_minimum_views" time. [default = 3]
    minimum_pts_size: 0.01           # The minimum distance for every two points in Global map (unit in meter). [default = 0.01] 
    image_downsample_ratio: 1        # The downsample ratio of the input image. [default = 1]
-   estimate_i2c_extrinsic: 0        # If enable estimate the extrinsic between camera and IMU. [default = 1] 
+   estimate_i2c_extrinsic: 1        # If enable estimate the extrinsic between camera and IMU. [default = 1] 
    estimate_intrinsic: 0            # If enable estimate the online intrinsic calibration of the camera lens. [default = 1] 
    maximum_vio_tracked_pts: 600     # The maximum points for tracking. [default = 600]
    append_global_map_point_step: 4  # The point step of append point to global map. [default = 4]
-   control_image_freq: 7.0          # The frequency [default = 10]
+   control_image_freq: 20.0          # The frequency [default = 10]
 
 r3live_vio:
    image_width: 640
    image_height: 480
    camera_intrinsic:
-      [866.411716, 0.0, 344.855379,
-      0.0,  867.711416, 248.662891,
+      [864, 0.0, 351,
+      0.0,  865, 256,
       0.0, 0.0, 1.0 ]
-   camera_dist_coeffs: [ -0.026447 , -0.029082 , -0.000322 ,  0.000343 , 0 ]  #k1, k2, p1, p2, k3         
-
+   camera_dist_coeffs: [ 0.3175 , -2.77 , 7.22e-03 , 4.136e-03 , 3.1 ]  #k1, k2, p1, p2, k3         
 
    # Fine extrinsic value. form camera-LiDAR calibration.
    # 和 fast_livo 里面的 相反
    camera_ext_R:
-         [-0.00720174, -0.0173991 ,  0.999823 ,
-          -0.999818  , 0.0178033  , -0.00689188 ,
-          -0.0176803 , -0.99969   , -0.0175242 ]
+         [-0.00207836 , -0.0127348 ,  0.999917  , 
+          -0.999688   ,  0.0249168 , -0.0017605 ,
+          -0.0248923  ,  -0.999608 , -0.0127826   ]
 
-   camera_ext_t: [ 0.0570864 , -0.0439043 , 0.0170811 ]
+   camera_ext_t: [ 0.0407803 , -0.0531845 , 0.051548 ]
 
    #    # livox
    # camera_ext_R:

@@ -1,0 +1,24 @@
+<launch>
+    <!-- Subscribed topics -->
+    <param name="LiDAR_pointcloud_topic" type="string" value= "/laser_cloud_flat" />
+    <param name="IMU_topic" type="string" value= "/livox/imu" />
+    <param name="Image_topic" type="string" value= "/hk_camera/image_color" />
+    <param name="r3live_common/map_output_dir" type="string" value="$(env HOME)/r3live_output" />
+    <rosparam command="load" file="$(find r3live)/../config/r3live_config_v2_vanjee_hk.yaml" />
+
+    <node pkg="r3live" type="r3live_LiDAR_front_end" name="r3live_LiDAR_front_end"  output="screen" required="true">
+      <remap from="/velodyne_points" to="/vanjee_points"/>
+    </node>
+    
+    <node pkg="r3live" type="r3live_mapping" name="r3live_mapping" output="screen" required="true" />
+    
+    <arg name="rviz" default="0" />
+    <group if="$(arg rviz)">
+        <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find r3live)/../config/rviz/r3live_rviz_config.rviz" />
+    </group>
+
+    <!-- <node pkg="rosbag" type="play" name="bagplay" output="screen" required="true" args="/home/bag/vanjee_hk/vanjee_true/v2_vanjee_HK_outdoor_202306191534.bag -d 10 -r 0.3" /> -->
+    <node pkg="rosbag" type="play" name="bagplay" output="screen" required="true" args="/home/bag/vanjee_hk/vanjee_true/v2_vanjee_HK_outdoor_20230619.bag -d 10 -r 0.2" />
+    <node pkg="r2live" type="save_registered_cloud" name="save_registered_cloud"  output="log"/>
+
+</launch>

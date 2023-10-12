@@ -93,9 +93,30 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     // TODO: fix the cov
     cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    state_inout.gravity = Eigen::Vector3d( 0, 0, 9.805 );
+    state_inout.gravity = Eigen::Vector3d( 0, 0, 9.7949 );
     state_inout.rot_end = Eye3d;
     state_inout.bias_g = mean_gyr;
+
+    // cov_acc = 2 * Eigen::Vector3d(3.5777084105960762e-02, 7.5681264264034955e-03, 7.6462912213032764e-03);
+    // cov_gyr = 2 * Eigen::Vector3d(8.5779956727165350e-04,  2.2276276824897542e-03,  9.5191250709482996e-04);
+    // state_inout.gravity = Eigen::Vector3d( 0, 0, 9.7949 );
+    // state_inout.rot_end = Eye3d;
+    // state_inout.bias_g  = Eigen::Vector3d(1.1699146437252875e-05, 3.2473325004258856e-05, 9.2550020036845043e-06);
+
+    // fast_livo粘贴过来的
+
+    // v1
+    // cout<<"cov_acc: "<< cov_acc <<endl;
+    // cout<<"cov_gyr: "<< cov_gyr <<endl;
+    state_inout.bias_g  = Eigen::Vector3d(4.7157402991064573e-05, 2.2978607798053355e-05, 2.1783118083287548e-05);
+    cov_acc = Eigen::Vector3d(2.0259191796012588e-02, 2.1399993219216693e-02, 2.0015146318205921e-02 );
+    cov_gyr = Eigen::Vector3d(3.6806968082877308e-03, 3.3074486920622384e-03, 1.6674201356901494e-03 );
+  
+    // v2 0306 重新标定 
+    // state_inout.bias_g  = Eigen::Vector3d(5.4948744932339505e-07 , 1.1750347349853966e-06,  1.1684096702078937e-06); 
+    // cov_gyr = Eigen::Vector3d(5.8591807220402780e-05 , 5.6768594514768940e-05, 6.3940101951102265e-05);
+    // cov_acc = Eigen::Vector3d(5.0349683140255778e-04 , 4.2914934657991096e-04, 5.2044122034212179e-04);
+
 }
 
 void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &state_inout )
